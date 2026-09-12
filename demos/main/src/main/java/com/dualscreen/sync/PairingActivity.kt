@@ -27,7 +27,7 @@ class PairingActivity : Activity() {
         val status = TextView(this).apply { text = "Not connected" }
         val sideRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
 
-        for (side in Side.entries) {
+        for (side in Side.values()) {
             sideRow.addView(Button(this).apply {
                 text = "Peer is ${side.name}"
                 setOnClickListener {
