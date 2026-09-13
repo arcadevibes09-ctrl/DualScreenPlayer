@@ -18,22 +18,28 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.google.android.exoplayer2.demo">
 
+  <!-- Core network permissions for sockets and HTTP streaming -->
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+  <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+
+  <!-- Storage access to pick and stream local video files -->
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+
+  <!-- Camera permission for QR scanning -->
+  <uses-permission android:name="android.permission.CAMERA"/>
+  <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
+  <!-- Background tasks and playback service permissions -->
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-  <uses-permission android:name="android.permission.CAMERA" />
-  <uses-feature android:name="android.hardware.camera" android:required="false" />
-
-  <!-- Added for Dual-Screen Sync -->
-  <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
   <uses-feature android:name="android.software.leanback" android:required="false"/>
   <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
-  
-  <!-- Bypass ZXing minSdk 19 check -->
+
+  <!-- Overrides library minSdk constraint to prevent merge conflicts -->
   <uses-sdk tools:overrideLibrary="com.google.zxing.client.android" />
 
   <application
@@ -44,33 +50,41 @@
       android:largeHeap="true"
       android:allowBackup="false"
       android:requestLegacyExternalStorage="true"
+      android:usesCleartextTraffic="true"
       android:supportsRtl="true"
       android:name="androidx.multidex.MultiDexApplication"
       tools:targetApi="29">
 
-     <!-- ZXing Scanner portrait support with tools:replace to resolve manifest conflict -->
-     <activity
-          android:name="com.journeyapps.barcodescanner.CaptureActivity"
-          android:screenOrientation="fullSensor"
-          tools:replace="android:screenOrientation"
-          android:windowSoftInputMode="stateAlwaysHidden" />
+    <!-- ZXing scanner activity with orientation replacement -->
+    <activity
+        android:name="com.journeyapps.barcodescanner.CaptureActivity"
+        android:screenOrientation="fullSensor"
+        tools:replace="android:screenOrientation"
+        android:windowSoftInputMode="stateAlwaysHidden" />
 
-    <!-- New Dual-Screen Launch Activity -->
-    <activity android:name="com.dualscreen.sync.PairingActivity" android:exported="true">
+    <!-- Dual-screen pairing entrance -->
+    <activity
+        android:name="com.dualscreen.sync.PairingActivity"
+        android:exported="true"
+        android:screenOrientation="portrait">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
     </activity>
-    
-    <activity android:name="com.dualscreen.sync.PlayerActivity" android:exported="false" />
 
-    <activity android:name=".SampleChooserActivity"
+    <!-- Synchronized dual-screen video player -->
+    <activity
+        android:name="com.dualscreen.sync.PlayerActivity"
+        android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+        android:exported="false" />
+
+    <activity
+        android:name=".SampleChooserActivity"
         android:configChanges="keyboardHidden"
         android:label="@string/application_name"
         android:theme="@style/Theme.AppCompat"
         android:exported="true">
-      <!-- MAIN and LAUNCHER filters removed to route boot to PairingActivity -->
       <intent-filter>
         <action android:name="android.intent.action.VIEW"/>
         <action android:name="com.google.android.exoplayer.demo.action.BROWSE"/>
@@ -86,7 +100,8 @@
       </intent-filter>
     </activity>
 
-    <activity android:name=".PlayerActivity"
+    <activity
+        android:name=".PlayerActivity"
         android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
         android:launchMode="singleTop"
         android:label="@string/application_name"
@@ -114,7 +129,8 @@
       </intent-filter>
     </activity>
 
-    <service android:name=".DemoDownloadService"
+    <service
+        android:name=".DemoDownloadService"
         android:exported="false">
       <intent-filter>
         <action android:name="com.google.android.exoplayer.downloadService.action.RESTART"/>
@@ -122,11 +138,10 @@
       </intent-filter>
     </service>
 
-    <service android:name="com.google.android.exoplayer2.scheduler.PlatformScheduler$PlatformSchedulerService"
+    <service
+        android:name="com.google.android.exoplayer2.scheduler.PlatformScheduler$PlatformSchedulerService"
         android:permission="android.permission.BIND_JOB_SERVICE"
         android:exported="true"/>
 
   </application>
-
 </manifest>
-

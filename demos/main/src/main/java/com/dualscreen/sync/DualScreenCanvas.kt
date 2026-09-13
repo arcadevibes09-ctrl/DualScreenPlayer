@@ -1,60 +1,63 @@
 package com.dualscreen.sync
 
-import android.content.Context
-import android.widget.FrameLayout
-import com.google.android.exoplayer2.ui.AspectRatioFrameLayout
-import com.google.android.exoplayer2.ui.PlayerView
+import android.os.SystemClock
+import org.json.JSONArray
+import org.json.JSONObject
 
-/**
- * Hosts an oversized PlayerView representing the FULL combined video canvas (both phones'
- * screens put together), positioned with a negative offset so only THIS phone's slice is
- * visible. clipChildren=true on the parent is what actually crops the picture — no matrix
- * math on the video surface needed.
- */
-class DualScreenCanvas(context: Context) : FrameLayout(context) {
-    val playerView = PlayerView(context).apply {
-        useController = false
-        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+sealed class SyncMessage {
+    abstract fun toJson(): JSONObject
+
+    data class Hello(val widthMm: Float, val heightMm: Float) : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "HELLO").put("w", widthMm).put("h", heightMm)
+    }
+    data class ArrangementMsg(val peerSideFromSender: String) : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "ARRANGEMENT").put("side", peerSideFromSender)
+    }
+    data class PrepareVideos(val urls: List<String>) : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "PREPARE").put("urls", JSONArray(urls))
+    }
+    object LaunchPlayer : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "LAUNCH")
+    }
+    data class Ping(val t0: Long) : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "PING").put("t0", t0)
+    }
+    data class Pong(val t0: Long, val t1: Long) : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "PONG").put("t0", t0).put("t1", t1)
+    }
+    data class Play(val positionMs: Long, val senderClockMs: Long = SystemClock.elapsedRealtime()) : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "PLAY").put("pos", positionMs).put("clock", senderClockMs)
+    }
+    data class Pause(val positionMs: Long, val senderClockMs: Long = SystemClock.elapsedRealtime()) : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "PAUSE").put("pos", positionMs).put("clock", senderClockMs)
+    }
+    data class Seek(val positionMs: Long, val senderClockMs: Long = SystemClock.elapsedRealtime()) : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "SEEK").put("pos", positionMs).put("clock", senderClockMs)
+    }
+    data class Heartbeat(val positionMs: Long, val senderClockMs: Long = SystemClock.elapsedRealtime()) : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "HEARTBEAT").put("pos", positionMs).put("clock", senderClockMs)
     }
 
-    init {
-        clipChildren = true
-        clipToPadding = true
-        addView(playerView)
-    }
-
-    /** Call once the arrangement is known, and again whenever the video's intrinsic size changes. */
-    fun applyArrangement(arrangement: Arrangement, videoWidth: Int, videoHeight: Int) {
-        if (videoWidth == 0 || videoHeight == 0) return
-        val dm = context.resources.displayMetrics
-        val myDpiX = dm.xdpi
-        val myDpiY = dm.ydpi
-
-        // "Cover" scale: fill the whole combined canvas, cropping any excess (like centerCrop).
-        val canvasAspect = arrangement.canvasWidthMm / arrangement.canvasHeightMm
-        val videoAspect = videoWidth.toFloat() / videoHeight.toFloat()
-        val scaledWidthMm: Float
-        val scaledHeightMm: Float
-        if (videoAspect > canvasAspect) {
-            scaledHeightMm = arrangement.canvasHeightMm
-            scaledWidthMm = scaledHeightMm * videoAspect
-        } else {
-            scaledWidthMm = arrangement.canvasWidthMm
-            scaledHeightMm = scaledWidthMm / videoAspect
+    companion object {
+        fun parse(line: String): SyncMessage? {
+            val o = JSONObject(line)
+            return when (o.getString("type")) {
+                "HELLO" -> Hello(o.getDouble("w").toFloat(), o.getDouble("h").toFloat())
+                "ARRANGEMENT" -> ArrangementMsg(o.getString("side"))
+                "PREPARE" -> {
+                    val arr = o.getJSONArray("urls")
+                    val list = (0 until arr.length()).map { arr.getString(it) }
+                    PrepareVideos(list)
+                }
+                "LAUNCH" -> LaunchPlayer
+                "PING" -> Ping(o.getLong("t0"))
+                "PONG" -> Pong(o.getLong("t0"), o.getLong("t1"))
+                "PLAY" -> Play(o.getLong("pos"), o.getLong("clock"))
+                "PAUSE" -> Pause(o.getLong("pos"), o.getLong("clock"))
+                "SEEK" -> Seek(o.getLong("pos"), o.getLong("clock"))
+                "HEARTBEAT" -> Heartbeat(o.getLong("pos"), o.getLong("clock"))
+                else -> null
+            }
         }
-        val centerOffsetXMm = (arrangement.canvasWidthMm - scaledWidthMm) / 2f
-        val centerOffsetYMm = (arrangement.canvasHeightMm - scaledHeightMm) / 2f
-
-        // Convert the scaled video's mm size into THIS device's own pixels via its own DPI —
-        // this is the step that keeps two different phone models aligned correctly.
-        val bigWidthPx = (scaledWidthMm / 25.4f * myDpiX).toInt()
-        val bigHeightPx = (scaledHeightMm / 25.4f * myDpiY).toInt()
-        playerView.layoutParams = LayoutParams(bigWidthPx, bigHeightPx)
-
-        val myOffsetXMm = centerOffsetXMm - arrangement.local.offsetXMm
-        val myOffsetYMm = centerOffsetYMm - arrangement.local.offsetYMm
-        playerView.translationX = myOffsetXMm / 25.4f * myDpiX
-        playerView.translationY = myOffsetYMm / 25.4f * myDpiY
-        requestLayout()
     }
 }
