@@ -1,9 +1,9 @@
 package com.dualscreen.sync
 
 import android.os.SystemClock
+import org.json.JSONArray
 import org.json.JSONObject
 
-/** Every message sent over the control socket between the two phones. */
 sealed class SyncMessage {
     abstract fun toJson(): JSONObject
 
@@ -12,6 +12,12 @@ sealed class SyncMessage {
     }
     data class ArrangementMsg(val peerSideFromSender: String) : SyncMessage() {
         override fun toJson(): JSONObject = JSONObject().put("type", "ARRANGEMENT").put("side", peerSideFromSender)
+    }
+    data class PrepareVideos(val urls: List<String>) : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "PREPARE").put("urls", JSONArray(urls))
+    }
+    object LaunchPlayer : SyncMessage() {
+        override fun toJson(): JSONObject = JSONObject().put("type", "LAUNCH")
     }
     data class Ping(val t0: Long) : SyncMessage() {
         override fun toJson(): JSONObject = JSONObject().put("type", "PING").put("t0", t0)
@@ -38,6 +44,12 @@ sealed class SyncMessage {
             return when (o.getString("type")) {
                 "HELLO" -> Hello(o.getDouble("w").toFloat(), o.getDouble("h").toFloat())
                 "ARRANGEMENT" -> ArrangementMsg(o.getString("side"))
+                "PREPARE" -> {
+                    val arr = o.getJSONArray("urls")
+                    val list = (0 until arr.length()).map { arr.getString(it) }
+                    PrepareVideos(list)
+                }
+                "LAUNCH" -> LaunchPlayer
                 "PING" -> Ping(o.getLong("t0"))
                 "PONG" -> Pong(o.getLong("t0"), o.getLong("t1"))
                 "PLAY" -> Play(o.getLong("pos"), o.getLong("clock"))
