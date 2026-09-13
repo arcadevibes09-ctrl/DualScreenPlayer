@@ -27,13 +27,14 @@
   <uses-permission android:name="android.permission.CAMERA" />
   <uses-feature android:name="android.hardware.camera" android:required="false" />
 
-  
   <!-- Added for Dual-Screen Sync -->
   <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
   <uses-feature android:name="android.software.leanback" android:required="false"/>
   <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
-  <uses-sdk/>
+  
+  <!-- Bypass ZXing minSdk 19 check -->
+  <uses-sdk tools:overrideLibrary="com.google.zxing.client.android" />
 
   <application
       android:hardwareAccelerated="true"
@@ -47,12 +48,12 @@
       android:name="androidx.multidex.MultiDexApplication"
       tools:targetApi="29">
 
-     <!-- ZXing Scanner portrait support -->
+     <!-- ZXing Scanner portrait support with tools:replace to resolve manifest conflict -->
      <activity
           android:name="com.journeyapps.barcodescanner.CaptureActivity"
           android:screenOrientation="fullSensor"
+          tools:replace="android:screenOrientation"
           android:windowSoftInputMode="stateAlwaysHidden" />
-
 
     <!-- New Dual-Screen Launch Activity -->
     <activity android:name="com.dualscreen.sync.PairingActivity" android:exported="true">
@@ -128,3 +129,4 @@
   </application>
 
 </manifest>
+
