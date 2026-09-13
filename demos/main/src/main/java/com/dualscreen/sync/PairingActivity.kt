@@ -48,6 +48,15 @@ class PairingActivity : ComponentActivity() {
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris: List<Uri> ->
         if (uris.isNotEmpty()) {
+            for (uri in uris) {
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (_: Exception) {}
+            }
+            SyncSession.videoServer?.stop()
             SyncSession.videoServer = LocalVideoServer(this).apply {
                 setVideos(uris)
                 start()
@@ -125,6 +134,8 @@ class PairingActivity : ComponentActivity() {
 
         hostBtn.setOnClickListener {
             SyncSession.isHost = true
+            hostIp = localIpAddress() ?: "192.168.43.1"
+            ipLabel.text = "This device IP: $hostIp"
             thread {
                 socket.host {
                     runOnUiThread {
@@ -244,11 +255,22 @@ class PairingActivity : ComponentActivity() {
     }
 
     private fun localIpAddress(): String? {
-        NetworkInterface.getNetworkInterfaces().asSequence().forEach { intf ->
-            intf.inetAddresses.asSequence().forEach { addr ->
-                if (!addr.isLoopbackAddress && addr.hostAddress?.contains(":") == false) return addr.hostAddress
+        var fallbackIp: String? = null
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces() ?: return null
+            for (intf in interfaces.asSequence()) {
+                val name = intf.name.lowercase()
+                // Ignore mobile cellular data interfaces (rmnet, ccmni, dummy)
+                if (name.contains("rmnet") || name.contains("dummy") || name.contains("p2p")) continue
+                for (addr in intf.inetAddresses) {
+                    if (!addr.isLoopbackAddress && addr.hostAddress?.contains(":") == false) {
+                        val ip = addr.hostAddress ?: continue
+                        if (name.contains("wlan") || name.contains("ap")) return ip
+                        if (fallbackIp == null) fallbackIp = ip
+                    }
+                }
             }
-        }
-        return null
+        } catch (_: Exception) {}
+        return fallbackIp
     }
 }

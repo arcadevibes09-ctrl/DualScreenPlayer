@@ -7,8 +7,10 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.WindowManager
+import android.widget.Toast
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
+import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.video.VideoSize
 
@@ -29,8 +31,7 @@ class PlayerActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Keep the display turned on and hide system navigation bars for a clean canvas
+
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
@@ -41,31 +42,48 @@ class PlayerActivity : Activity() {
             or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         )
 
-        val socket = SyncSession.socket ?: error("Pair first")
-        val clock = SyncSession.clockSync ?: error("Pair first")
-        val arrangement = SyncSession.arrangement ?: error("Arrangement missing")
+        val socket = SyncSession.socket ?: run {
+            Toast.makeText(this, "Pair first", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+        val clock = SyncSession.clockSync ?: run {
+            Toast.makeText(this, "Pair first", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+        val arrangement = SyncSession.arrangement ?: run {
+            Toast.makeText(this, "Arrangement missing", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
 
         player = ExoPlayer.Builder(this).build().apply {
             repeatMode = Player.REPEAT_MODE_ALL
         }
 
         canvas = DualScreenCanvas(this)
-        // Enable controller so taps trigger play/pause syncing
-        canvas.playerView.useController = true
         canvas.playerView.player = player
         setContentView(canvas)
 
         syncController = PlaybackSyncController(player, socket, clock)
         syncController.attachPlayerListener()
 
-        // Transfer socket listener to playback control
-        socket.listener = { msg -> syncController.handleRemoteMessage(msg) }
+        socket.listener = { msg ->
+            runOnUiThread {
+                syncController.handleRemoteMessage(msg)
+            }
+        }
 
         player.addListener(object : Player.Listener {
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 if (videoSize.width > 0 && videoSize.height > 0) {
                     canvas.applyArrangement(arrangement, videoSize.width, videoSize.height)
                 }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                Toast.makeText(this@PlayerActivity, "Playback error: ${error.message}", Toast.LENGTH_LONG).show()
             }
         })
 
